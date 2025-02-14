@@ -1,4 +1,5 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { Link } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useState } from 'react';
 import { Button, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -50,7 +51,7 @@ export default function App() {
                 xAxisColor="#0BA5A4"
                 color="#0BA5A4"
             />
-
+            <Link href="/journal">Journal</Link>
             <TextInput
                 placeholder='enter prompt'
                 value={prompt}

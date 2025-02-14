@@ -4,6 +4,7 @@ import { Text, TextInput, Button, Dialog, Portal, Provider } from 'react-native-
 import Slider from '@react-native-community/slider';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { format } from 'date-fns';
+import { useLocalSearchParams } from 'expo-router';
 
 // A fixed set of questions that can be asked.
 const QUESTIONS = [
@@ -13,12 +14,20 @@ const QUESTIONS = [
     "What are you grateful for?",
 ];
 
-const DailyQuestionsPage = () => {
-    // Today’s key for storage (responses and rating are reset each day)
-    const today = format(new Date(), 'yyyy-MM-dd');
-    const responsesKey = `responses_${today}`;
-    const ratingKey = `rating_${today}`;
+const todayJDate = () => format(new Date(), 'yyyy-MM-dd');
 
+const DailyQuestionsPage = ({}) => {
+    let {jDate} = useLocalSearchParams();
+
+    console.log(jDate);
+
+    // Today’s key for storage (responses and rating are reset each day)
+    if (!jDate) jDate = todayJDate();
+    
+    const responsesKey = `responses_${jDate}`;
+    const ratingKey = `rating_${jDate}`;
+    const datesKey = `dates`;
+    
     // Local state
     const [responses, setResponses] = useState([]);
     const [currentQuestion, setCurrentQuestion] = useState(null);
@@ -35,6 +44,21 @@ const DailyQuestionsPage = () => {
     useEffect(() => {
         const loadData = async () => {
             try {
+                
+                let dates = [];
+                const datesJSON = await AsyncStorage.getItem(datesKey);
+                if (datesJSON == null) {
+                    dates.push(jDate);
+                    AsyncStorage.setItem(datesKey, JSON.stringify(dates));
+                }
+                else {
+                    dates = JSON.parse(datesJSON);
+                    if (!dates.includes(jDate)) {
+                        dates.push(jDate);
+                        AsyncStorage.setItem(datesKey, JSON.stringify(dates));
+                    }
+                }
+
                 const storedResponses = await AsyncStorage.getItem(responsesKey);
                 if (storedResponses !== null) {
                     setResponses(JSON.parse(storedResponses));
@@ -156,7 +180,7 @@ const DailyQuestionsPage = () => {
                     data={responses}
                     keyExtractor={(item, index) => index.toString()}
                     renderItem={renderResponse}
-                    ListHeaderComponent={<Text style={styles.header}>Today's Responses</Text>}
+                    ListHeaderComponent={<Text style={styles.header}>{jDate==todayJDate() ? "Today" : jDate}'s Responses</Text>}
                     contentContainerStyle={styles.flatListContainer}
                 />
 

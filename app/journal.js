@@ -19,7 +19,7 @@ const todayJDate = () => format(new Date(), 'yyyy-MM-dd');
 const DailyQuestionsPage = ({}) => {
     let {jDate} = useLocalSearchParams();
 
-    console.log(jDate);
+    // console.log(jDate);
 
     // Today’s key for storage (responses and rating are reset each day)
     if (!jDate) jDate = todayJDate();
@@ -193,6 +193,9 @@ const DailyQuestionsPage = ({}) => {
                         step={1}
                         value={rating}
                         onSlidingComplete={updateRating}
+                        maximumTrackTintColor='#666'
+                        minimumTrackTintColor='#651299'
+                        thumbTintColor='#651299'
                     />
                 </View>
 

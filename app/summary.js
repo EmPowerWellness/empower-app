@@ -1,16 +1,23 @@
 import React, { useEffect, useState } from 'react';
-import { ScrollView, View } from 'react-native';
+import { ScrollView, View, StyleSheet } from 'react-native';
 import { LineChart } from 'react-native-gifted-charts';
-import { Surface, Text, Title, ActivityIndicator } from 'react-native-paper';
+import { Surface, Text, Title, ActivityIndicator, Button, Icon } from 'react-native-paper';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { subDays, format, parseISO } from 'date-fns';
+import { differenceInDays, format, parseISO } from 'date-fns';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+
+const COLOR1 = '#0BA5A4';
+const COLOR2 = '#651299';
 
 const SummaryScreen = () => {
     const [report, setReport] = useState('');
     const [userRatings, setUserRatings] = useState([]);
     const [geminiScores, setGeminiScores] = useState([]);
     const [loading, setLoading] = useState(true);
+
+    const [cachedReport, setCachedReport] = useState(null);
+    const [shoundGenerate, setShouldGenerate] = useState(false);
+    const [isReportExpired, setIsReportExpired] = useState(false);
 
     const genAI = new GoogleGenerativeAI(process.env.EXPO_PUBLIC_GEMINI_API_KEY);
 
@@ -73,19 +80,35 @@ JSON Response:`;
                     if (!report || !scores?.length) {
                         throw new Error('Invalid response structure from Gemini');
                     }
-                    
-                    setReport(report);
+
                     // Add this before setting geminiScores:
                     const validatedScores = scores.sort(
                         (a, b) => parseISO(a.date) - parseISO(b.date)
                     );
-                    setGeminiScores(scores);
                     // Update the userRatings mapping:
-                    setUserRatings(data.map(d => ({
+                    const validatedUserRatings = data.map(d => ({
                         value: d.rating,
                         date: d.date,
                         label: format(parseISO(d.date), 'MMM dd')
-                    })).sort((a, b) => parseISO(a.date) - parseISO(b.date)));
+                    })).sort((a, b) => parseISO(a.date) - parseISO(b.date));
+
+                    setReport(report);
+                    setGeminiScores(validatedScores);
+                    setUserRatings(validatedUserRatings);
+
+                    // Modify the existing effect to save report after generation
+                    // Inside the fetchDataAndGenerateReport function, after parsing the response:
+                    const reportData = {
+                        report,
+                        scores: validatedScores,
+                        userRatings: validatedUserRatings,
+                        timestamp: new Date().toISOString()
+                    };
+                    await AsyncStorage.setItem('cachedReport', JSON.stringify(reportData));
+                    setCachedReport(reportData);
+                    setIsReportExpired(false);
+
+                    setShouldGenerate(false);
                     setLoading(false);
                 } catch (parseError) {
                     console.error('Failed to parse JSON:', sanitizedText, parseError);
@@ -93,51 +116,128 @@ JSON Response:`;
                     setLoading(false);
 
                 }
-                
+
             } catch (error) {
                 console.error(error);
                 setLoading(false);
             }
         };
 
-        fetchDataAndGenerateReport();
-    }, []);
+        const loadCachedReport = async () => {
+            try {
+                const storedReport = await AsyncStorage.getItem('cachedReport');
+                if (storedReport) {
+                    const parsedReport = JSON.parse(storedReport);
+                    const reportDate = parseISO(parsedReport.timestamp);
+                    const daysOld = differenceInDays(new Date(), reportDate);
+
+                    setCachedReport(parsedReport);
+                    setIsReportExpired(daysOld > 7);
+                    setLoading(false);
+                }
+                else {
+                    setShouldGenerate(true);
+                }
+            } catch (error) {
+                console.error('Failed to load cached report:', error);
+            }
+        };
+        if (shoundGenerate) {
+            fetchDataAndGenerateReport();
+        }
+        else {
+            loadCachedReport();
+        }
+        
+    }, [shoundGenerate]);
+
+    // Add regeneration handler
+    const handleRegenerate = async () => {
+        setLoading(true);
+        setCachedReport(null);
+        setShouldGenerate(true);
+        await AsyncStorage.removeItem('cachedReport');
+    };
 
     if (loading) {
         return <ActivityIndicator style={{ flex: 1 }} />;
     }
     return (
         <ScrollView contentContainerStyle={{ padding: 16 }}>
-            <Surface style={{ padding: 16, marginBottom: 16, borderRadius: 8 }}>
-                <Title>Weekly Emotional Report</Title>
-                <Text style={{ marginTop: 8 }}>{report}</Text>
-            </Surface>
+            {cachedReport && (
+                <View style={{ alignItems: 'flex-end', marginBottom: 16 }}>
+                    <Button
+                        mode={isReportExpired ? 'contained' : 'outlined'}
+                        onPress={handleRegenerate}
+                        style={{ backgroundColor: isReportExpired ? '#ff4081' : undefined }}
+                    >
+                        Regenerate Report
+                    </Button>
+                    <Text style={{ fontSize: 12, color: '#666', marginTop: 4 }}>
+                        Last generated: {format(parseISO(cachedReport.timestamp), 'MMM dd, yyyy - hh:mm a')}
+                    </Text>
+                </View>
+            )}
 
-            <Surface style={{ padding: 16, marginBottom: 16, borderRadius: 8, overflow:'hidden' }}>
-                <Title>How you've felt last week</Title>
+            <Surface style={{ padding: 16, marginBottom: 16, borderRadius: 8, overflow: 'hidden' }}>
+                <Title style={styles.titleText}>How you've felt last week</Title>
                 <LineChart
                     curved
                     initialSpacing={20}
-                    data={userRatings}
-                    data2={geminiScores}
+                    data={cachedReport ? cachedReport.userRatings : userRatings}
+                    data2={cachedReport ? cachedReport.scores : geminiScores}
                     spacing={60}
                     thickness={2}
                     hideRules
                     showValuesAsDataPointsText
-                    yAxisColor="#0BA5A4"
+                    yAxisColor={COLOR1}
                     showVerticalLines
                     verticalLinesColor="rgba(14,164,164,0.5)"
-                    xAxisColor="#0BA5A4"
-                    color1="#0BA5A4"
-                    color2="#651299"
-                    dataPointsColor1='#0BA5A4'
-                    dataPointsColor2='#651299'
+                    xAxisColor={COLOR1}
+                    color1={COLOR1}
+                    color2={COLOR2}
+                    dataPointsColor1={COLOR1}
+                    dataPointsColor2={COLOR2}
                     maxValue={10}
                     xAxisLabelTexts={userRatings.map(r => format(parseISO(r.date), 'dd/MM'))} />
-                    
+                    <View style={styles.legendKey}>
+                        <Icon source="circle" color={COLOR1} size={10} />
+                        <Text>Your Ratings</Text>
+                    </View>
+                    <View style={styles.legendKey}>
+                        <Icon source="circle" color={COLOR2} size={10} />
+                        <Text>Re-evaluated Ratings</Text>
+                    </View>
+            </Surface>
+
+            <Surface style={{ padding: 16, marginBottom: 16, borderRadius: 8 }}>
+                <Title style={styles.titleText}>Weekly Emotional Report</Title>
+                <Text style={{ marginTop: 8 }}>{cachedReport ? cachedReport.report : report}</Text>
             </Surface>
         </ScrollView>
     );
 };
 
 export default SummaryScreen;
+
+
+const styles = StyleSheet.create({
+    container: {
+        flex: 1,
+        backgroundColor: '#fff',
+        padding: 10,
+        gap: 10,
+    },
+    titleText: {
+        fontWeight: 'bold',
+        marginBottom: 8,
+    },
+    legendKey: {
+        flex:1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+        paddingHorizontal: 10,
+        marginTop: 8,
+    }
+});

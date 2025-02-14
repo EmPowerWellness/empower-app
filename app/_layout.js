@@ -6,7 +6,7 @@ import { StatusBar } from 'expo-status-bar';
 export default function HomeLayout() {
     return <View style={styles.container}>
         <Tabs screenOptions={{
-            tabBarActiveTintColor: 'blue',
+            tabBarActiveTintColor: '#651299',
             tabBarStyle: { height: 58 },
         }}>
             <Tabs.Screen

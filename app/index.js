@@ -2,12 +2,23 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { StatusBar } from 'expo-status-bar';
 import { useState } from 'react';
 import { Button, StyleSheet, Text, TextInput, View } from 'react-native';
+import { BarChart, LineChart } from 'react-native-gifted-charts';
 
 export default function App() {
     const [prompt, setPrompt] = useState();
     const [text, setText] = useState('--something--');
 
-    const handleClick = async() => {
+    const barData = [
+        { value: 250, label: 'M' },
+        { value: 500, label: 'T', frontColor: '#177AD5' },
+        { value: 745, label: 'W', frontColor: '#177AD5' },
+        { value: 320, label: 'T' },
+        { value: 600, label: 'F', frontColor: '#177AD5' },
+        { value: 256, label: 'S' },
+        { value: 300, label: 'S' },
+    ];
+
+    const handleClick = async () => {
         console.log('clicked [start]');
         setText(runPrompt(prompt));
         console.log('.. prompt end');
@@ -15,6 +26,31 @@ export default function App() {
 
     return (
         <View style={styles.container}>
+            <BarChart
+                
+                barWidth={22}
+                barBorderRadius={4}
+                frontColor="lightgray"
+                data={barData}
+                yAxisThickness={0}
+                xAxisThickness={0}
+            />
+            <LineChart
+                curved
+                initialSpacing={0}
+                data={barData}
+                spacing={50}
+                hideDataPoints
+                thickness={5}
+                hideRules
+                hideYAxisText
+                yAxisColor="#0BA5A4"
+                showVerticalLines
+                verticalLinesColor="rgba(14,164,164,0.5)"
+                xAxisColor="#0BA5A4"
+                color="#0BA5A4"
+            />
+
             <TextInput
                 placeholder='enter prompt'
                 value={prompt}
